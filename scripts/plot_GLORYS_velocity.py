@@ -25,7 +25,7 @@ ds_oxy = swm_utilities.get_oxygen_data()
 oxyg = np.squeeze(ds_oxy.o_an.isel(depth=36).values)      # 750: 41 # 375: 31 # 225: 25
 
 #%%
-savefig = False
+savefig = True
 panel_labs = ['a)']
 panel_doc = [r'$\overline{u}$ in ms$^{-1}$'+'\n'+r'$\overline{O_2}$ in $\mu$mol kg$^{-1}$'+'\nat '+'~500m']
 props = dict(boxstyle='round', facecolor='#FFFFFF', alpha=0.9)

@@ -10,6 +10,7 @@ import xarray as xr
 import matplotlib.pyplot as plt
 import cmocean as cmo
 from scipy.ndimage import convolve1d
+import os
 
 #%% Load further utilities
 import swm_utilities
@@ -69,7 +70,7 @@ conv_kernel = np.ones(kernel_length)
 C_anom_percent_convolved = convolve1d(C_anom_percent,conv_kernel,axis=0,mode='nearest')/kernel_length
 
 #%% Plot the variability 
-savefig = False
+savefig = True
 timevec = np.arange(last_year-number_of_years,last_year,1/12.)
 
 plt.rcParams['font.size']=20
@@ -102,9 +103,9 @@ plt.tight_layout()
 plt.colorbar(c1,ax=ax[1],pad=0.01,label='Tracer anomaly in %',ticks=[-4,-2,0,2,4])
 plt.subplots_adjust(wspace=0.15,right=1.02)
 if savefig == True:
-    figname = 'fig_23W_SWM'
+    figname = '../plots/fig_23W_SWM'
     plt.savefig('{}.png'.format(figname),dpi=250)
-    plt.savefig('{}.pdf'.format(figname),dpi=250)
+    os.system('convert {}.png {}.pdf'.format(figname,figname))
 plt.show()
 
 # %%

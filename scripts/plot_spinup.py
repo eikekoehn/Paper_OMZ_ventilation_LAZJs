@@ -48,7 +48,7 @@ h0 = 500. # undisturbed layer depth
 
 #%% Plot the snapshots
 print('Set plotting parameters.')
-savefig = False
+savefig = True
 panel_labs = ['a)','b)','c)','d)','e)','f)']
 props = dict(boxstyle='round', facecolor='#EEEEEE', alpha=0.9)
 #

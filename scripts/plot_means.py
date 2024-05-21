@@ -88,7 +88,7 @@ vhat = means_dict['mv']/means_dict['dv']
 #####################
  
 print('Set plot properties.')
-savefig = False
+savefig = True
 panel_labs = ['a)','b)','c)','d)']
 panel_doc = [r'$\overline{h}$'+'\n'+'in m',r'$\hat{C}$',r'$\hat{u}$'+'\n'+'in ms$^{-1}$',r'$\hat{v}$'+'\n'+'in ms$^{-1}$']
 props = dict(boxstyle='round', facecolor='#EEEEEE', alpha=0.9)

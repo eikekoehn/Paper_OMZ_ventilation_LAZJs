@@ -29,6 +29,79 @@ def add_arrows_to_plots(fig,start_axi,end_axi,connectionstyle):
     )
     fig.patches.append(arrow)
 
+def set_up_gradient_arrays(variable_dict):
+    A = 6371000
+    lon_e = 15
+    lon_s = -65
+    lat_e = 50
+    lat_s = -20
+    nx = 801
+    ny = 701
+    d2r = (2*np.pi)/360
+    dLambda = (lon_e - lon_s)/(nx-1)*d2r # longitudinal grid spacing in radians
+    dTheta = (lat_e - lat_s)/(ny-1)*d2r # latitudinal grid spacing in radians
+    coslat_v = np.cos(variable_dict['vhc']['dataarray'].LATITUDE.values*np.pi/180)
+    coslat_h = np.cos(variable_dict['eta']['dataarray'].LATITUDE.values*np.pi/180)
+    return dLambda, dTheta, coslat_v, coslat_h, A
+
+def calc_advective_flux_convergence(variable_dict,A,dLambda,dTheta,coslat_h,coslat_v):
+    uhc_advflux_convergence = np.zeros_like(variable_dict['eta']['varmean'])  + np.NaN
+    vhc_advflux_convergence = np.zeros_like(variable_dict['eta']['varmean'])  + np.NaN
+    uhc_advflux_convergence[:,:-1] = (-1)*(variable_dict['uhc']['varmean'][:,1:].values - variable_dict['uhc']['varmean'][:,:-1].values) / dLambda / A / coslat_h[:,None]
+    vhc_advflux_convergence[:-1,:] = (-1)*(variable_dict['vhc']['varmean'][1:,:].values * coslat_v[1:,None] - variable_dict['vhc']['varmean'][:-1,:].values * coslat_v[:-1,None]) / dTheta / A / coslat_h[:-1,None]
+    advective_flux_convergence = uhc_advflux_convergence + vhc_advflux_convergence
+    return uhc_advflux_convergence, vhc_advflux_convergence, advective_flux_convergence
+
+def calc_mean_advective_flux_convergence(variable_dict,A,dLambda,dTheta,coslat_h,coslat_v):
+    adv_zonal_mean_flux = np.zeros_like(variable_dict['eta']['varmean'])  + np.NaN
+    adv_merid_mean_flux = np.zeros_like(variable_dict['eta']['varmean'])  + np.NaN
+    adv_total_mean_flux = np.zeros_like(variable_dict['eta']['varmean'])  + np.NaN
+    CH = variable_dict['CH']['varmean']
+    uvel = variable_dict['u']['varmean']
+    vvel = variable_dict['v']['varmean']
+    #
+    advmx = \
+    (-1)*(CH[:,2:].values   * uvel[:,2:].values)    /2/A/dLambda/coslat_h[:,None] + \
+         (CH[:,:-2].values  * uvel[:,1:-1].values)  /2/A/dLambda/coslat_h[:,None] + \
+    (-1)*(CH[:,1:-1].values * uvel[:,2:].values)    /2/A/dLambda/coslat_h[:,None] + \
+         (CH[:,1:-1].values * uvel[:,1:-1].values)  /2/A/dLambda/coslat_h[:,None]
+    #
+    advmy = \
+    (-1)*(CH[2:,:].values   * vvel[2:,:].values)    /2/A/dTheta/coslat_h[1:-1,None] * coslat_v[2:,None]  + \
+         (CH[:-2,:].values  * vvel[1:-1,:].values)  /2/A/dTheta/coslat_h[1:-1,None] * coslat_v[1:-1,None]  + \
+    (-1)*(CH[1:-1,:].values * vvel[2:,:].values)    /2/A/dTheta/coslat_h[1:-1,None] * coslat_v[2:,None]  + \
+         (CH[1:-1,:].values * vvel[1:-1,:].values)  /2/A/dTheta/coslat_h[1:-1,None] * coslat_v[1:-1,None]
+    #
+    totadvmflux = advmx[1:-1,:] + advmy[:,1:-1]   
+    adv_zonal_mean_flux[:,1:-1] = advmx
+    adv_merid_mean_flux[1:-1,:] = advmy
+    adv_total_mean_flux[1:-1,1:-1] = totadvmflux
+    return adv_zonal_mean_flux, adv_merid_mean_flux, adv_total_mean_flux
+
+def calc_eddy_advective_flux_convergence(variable_dict,A,dLambda,dTheta,coslat_h,coslat_v):
+    adv_zonal_eddy_flux = np.zeros_like(variable_dict['eta']['varmean'])  + np.NaN
+    adv_merid_eddy_flux = np.zeros_like(variable_dict['eta']['varmean'])  + np.NaN
+    adv_total_eddy_flux = np.zeros_like(variable_dict['eta']['varmean'])  + np.NaN
+    CH = variable_dict['CH']['varmean']
+    #
+    advex = \
+    (-1)*(CH[:,2:].values    *u_star[:,2:].values  )/2/A/dLambda/coslat_h[:,None]     + \
+         (CH[:,:-2].values   *u_star[:,1:-1].values)/2/A/dLambda/coslat_h[:,None]   + \
+    (-1)*(CH[:,1:-1].values  *u_star[:,2:].values  )/2/A/dLambda/coslat_h[:,None]   + \
+         (CH[:,1:-1].values  *u_star[:,1:-1].values)/2/A/dLambda/coslat_h[:,None]
+    #
+    advey = \
+    (-1)*(CH[2:,:].values    *v_star[2:,:].values)  /2/A/dTheta/coslat_h[1:-1,None] * coslat_v[2:,None]   + \
+         (CH[:-2,:].values   *v_star[1:-1,:].values)/2/A/dTheta/coslat_h[1:-1,None] * coslat_v[1:-1,None]   + \
+    (-1)*(CH[1:-1,:].values  *v_star[2:,:].values)  /2/A/dTheta/coslat_h[1:-1,None] * coslat_v[2:,None]   + \
+         (CH[1:-1,:].values  *v_star[1:-1,:].values)/2/A/dTheta/coslat_h[1:-1,None] * coslat_v[1:-1,None]
+    #
+    totadveflux = advex[1:-1,:] + advey[:,1:-1]   
+    adv_zonal_eddy_flux[:,1:-1] = advex
+    adv_merid_eddy_flux[1:-1,:] = advey
+    adv_total_eddy_flux[1:-1,1:-1] = totadveflux
+    return adv_zonal_eddy_flux, adv_merid_eddy_flux, adv_total_eddy_flux
+
 #%% Get the data directories 
 url_root_output = swm_utilities.load_data_directories()
 
@@ -121,6 +194,7 @@ datasets_to_load['diff']['ds'] = ds_diff
 datasets_to_load['diff']['varname'] = 'T1_diff'
 
 #%% Load the last 80 years of the data
+print('Load the last 80 years of the data')
 number_of_years = 80
 data_choice = dict()
 data_choice['time_minidx'] = -number_of_years*12 # last 240 years
@@ -145,6 +219,7 @@ for var2load in datasets_to_load.keys():
     print('Calculation for mean of {} done'.format(var2load))
 
 #%% Calculate thickness weighted averages and bolus velcoities
+print('Calculate thickness weighted averages and bolus velcoities')
 undisturbed_depth = 500.
 C_hat = variable_dict['CH']['varmean']/(variable_dict['eta']['varmean']+undisturbed_depth)
 u_hat = variable_dict['mu']['varmean']/variable_dict['du']['varmean']
@@ -153,6 +228,7 @@ u_star = u_hat - variable_dict['u']['varmean']
 v_star = v_hat - variable_dict['v']['varmean']
 
 #%% Set up the budget dictionary (Part 1)
+print('Set up the budget dictionary (Part 1)')
 
 budget_dict = dict()
 # Consumption
@@ -182,85 +258,56 @@ budget_dict['sum_of_forcing_relaxation_diffusion']['varname'] = 'Sum of other bu
 
 
 #%% Calculate values for the calculations of gradients etc.
-A = 6371000
-lon_e = 15
-lon_s = -65
-lat_e = 50
-lat_s = -20
-nx = 801
-ny = 701
-d2r = (2*np.pi)/360
-dLambda = (lon_e - lon_s)/(nx-1)*d2r # longitudinal grid spacing in radians
-dTheta = (lat_e - lat_s)/(ny-1)*d2r # latitudinal grid spacing in radians
-coslat_v = np.cos(variable_dict['vhc']['dataarray'].LATITUDE.values*np.pi/180)
-coslat_h = np.cos(variable_dict['eta']['dataarray'].LATITUDE.values*np.pi/180)
+print('Calculate values for the calculations of gradients etc.')
+dLambda, dTheta, coslat_v, coslat_h, A = set_up_gradient_arrays(variable_dict)
 
 #%% Calculate the advective flux convergence and put into budget_dictionary
-uhc_advflux_convergence = np.zeros_like(variable_dict['eta']['varmean'])  + np.NaN
-vhc_advflux_convergence = np.zeros_like(variable_dict['eta']['varmean'])  + np.NaN
-uhc_advflux_convergence[:,:-1] = (-1)*(variable_dict['uhc']['varmean'][:,1:].values - variable_dict['uhc']['varmean'][:,:-1].values) / dLambda / A / coslat_h[:,None]
-vhc_advflux_convergence[:-1,:] = (-1)*(variable_dict['vhc']['varmean'][1:,:].values * coslat_v[1:,None] - variable_dict['vhc']['varmean'][:-1,:].values * coslat_v[:-1,None]) / dTheta / A / coslat_h[:-1,None]
-advective_flux_convergence = uhc_advflux_convergence + vhc_advflux_convergence
-# 
+print('Calculate the advective flux convergence term.')
+
+uhc_advflux_convergence, vhc_advflux_convergence, advective_flux_convergence = calc_advective_flux_convergence(variable_dict,A,
+                                                                                                               dLambda,dTheta,coslat_h,coslat_v)
 budget_dict['advection'] = dict()
 budget_dict['advection']['data'] = advective_flux_convergence
 budget_dict['advection']['varname'] = 'Advective flux conv.: '+r'$- \nabla \cdot \left(\overline{h\vec{u}C}\right)$'
 
 #%% Calculate the sum of all terms
+print('Calculate the sum of all terms')
 sum_of_all = advective_flux_convergence + consumption + relaxation + forcing + diffusive_flux_convergence
+
 budget_dict['sum_of_all'] = dict()
 budget_dict['sum_of_all']['data'] = sum_of_all
 budget_dict['sum_of_all']['varname'] = 'Sum of all terms'
 
-
 #%% Now separate the total advective flux into the eddy flux conv., mean flux conv. and the eddy mixing.
-# 1st Term: Mean advection [ = - \nabla \cdot (\overbar{Ch} \bar{u})  ]
-adv_zonal_mean_flux = np.zeros_like(variable_dict['eta']['varmean'])  + np.NaN
-adv_merid_mean_flux = np.zeros_like(variable_dict['eta']['varmean'])  + np.NaN
-adv_total_mean_flux = np.zeros_like(variable_dict['eta']['varmean'])  + np.NaN
-advmx = \
-  (-1)*(variable_dict['CH']['varmean'][:,2:].values   * variable_dict['u']['varmean'][:,2:].values)  /2/A/dLambda/coslat_h[:,None] + \
-       (variable_dict['CH']['varmean'][:,:-2].values  * variable_dict['u']['varmean'][:,1:-1].values)/2/A/dLambda/coslat_h[:,None] + \
-  (-1)*(variable_dict['CH']['varmean'][:,1:-1].values * variable_dict['u']['varmean'][:,2:].values)  /2/A/dLambda/coslat_h[:,None] + \
-       (variable_dict['CH']['varmean'][:,1:-1].values * variable_dict['u']['varmean'][:,1:-1].values)/2/A/dLambda/coslat_h[:,None]
-advmy = \
-  (-1)*(variable_dict['CH']['varmean'][2:,:].values   * variable_dict['v']['varmean'][2:,:].values)  /2/A/dTheta/coslat_h[1:-1,None] * coslat_v[2:,None]  + \
-       (variable_dict['CH']['varmean'][:-2,:].values  * variable_dict['v']['varmean'][1:-1,:].values)/2/A/dTheta/coslat_h[1:-1,None] * coslat_v[1:-1,None]  + \
-  (-1)*(variable_dict['CH']['varmean'][1:-1,:].values * variable_dict['v']['varmean'][2:,:].values)  /2/A/dTheta/coslat_h[1:-1,None] * coslat_v[2:,None]  + \
-       (variable_dict['CH']['varmean'][1:-1,:].values * variable_dict['v']['varmean'][1:-1,:].values)/2/A/dTheta/coslat_h[1:-1,None] * coslat_v[1:-1,None]
-totadvmflux = advmx[1:-1,:] + advmy[:,1:-1]   
-adv_zonal_mean_flux[:,1:-1] = advmx
-adv_merid_mean_flux[1:-1,:] = advmy
-adv_total_mean_flux[1:-1,1:-1] = totadvmflux
-#
+print('Separate the total advective flux into the eddy flux conv., mean flux conv. and the eddy mixing.')
+
+#######################################################################
+# 1st Term: Mean advection [ = - \nabla \cdot (\overbar{Ch} \bar{u}) ]
+#######################################################################
+print('-> Mean advection')
+
+adv_zonal_mean_flux, adv_merid_mean_flux, adv_total_mean_flux = calc_mean_advective_flux_convergence(variable_dict,A,
+                                                                                                     dLambda,dTheta,coslat_h,coslat_v)
 budget_dict['adv_meanflux_total'] = dict()
 budget_dict['adv_meanflux_total']['data'] = adv_total_mean_flux
 budget_dict['adv_meanflux_total']['varname'] = 'Total mean flux conv.: '+r'$- \nabla \cdot \left(\bar{h}\bar{\vec{u}}\hat{C}\right)$'
 
+
+#####################################################################
 # 2nd Term: Eddy advection [ = - \nabla \cdot (\overbar{Ch} u_star)  ]
-adv_zonal_eddy_flux = np.zeros_like(variable_dict['eta']['varmean'])  + np.NaN
-adv_merid_eddy_flux = np.zeros_like(variable_dict['eta']['varmean'])  + np.NaN
-adv_total_eddy_flux = np.zeros_like(variable_dict['eta']['varmean'])  + np.NaN
-advex = \
-  (-1)*(variable_dict['CH']['varmean'][:,2:].values  *u_star[:,2:].values  )/2/A/dLambda/coslat_h[:,None]     + \
-       (variable_dict['CH']['varmean'][:,:-2].values *u_star[:,1:-1].values)/2/A/dLambda/coslat_h[:,None]   + \
-  (-1)*(variable_dict['CH']['varmean'][:,1:-1].values*u_star[:,2:].values  )/2/A/dLambda/coslat_h[:,None]   + \
-       (variable_dict['CH']['varmean'][:,1:-1].values*u_star[:,1:-1].values)/2/A/dLambda/coslat_h[:,None]
-advey = \
-  (-1)*(variable_dict['CH']['varmean'][2:,:].values  *v_star[2:,:].values  )/2/A/dTheta/coslat_h[1:-1,None] * coslat_v[2:,None]   + \
-       (variable_dict['CH']['varmean'][:-2,:].values *v_star[1:-1,:].values)/2/A/dTheta/coslat_h[1:-1,None] * coslat_v[1:-1,None]   + \
-  (-1)*(variable_dict['CH']['varmean'][1:-1,:].values*v_star[2:,:].values  )/2/A/dTheta/coslat_h[1:-1,None] * coslat_v[2:,None]   + \
-       (variable_dict['CH']['varmean'][1:-1,:].values*v_star[1:-1,:].values)/2/A/dTheta/coslat_h[1:-1,None] * coslat_v[1:-1,None]
-totadveflux = advex[1:-1,:] + advey[:,1:-1]   
-adv_zonal_eddy_flux[:,1:-1] = advex
-adv_merid_eddy_flux[1:-1,:] = advey
-adv_total_eddy_flux[1:-1,1:-1] = totadveflux
-#
+#####################################################################
+print('-> Eddy advection')
+
+adv_zonal_eddy_flux, adv_merid_eddy_flux, adv_total_eddy_flux = calc_eddy_advective_flux_convergence(variable_dict,A,
+                                                                                                     dLambda,dTheta,coslat_h,coslat_v)
 budget_dict['adv_eddyflux_total'] = dict()
 budget_dict['adv_eddyflux_total']['data'] = adv_total_eddy_flux
 budget_dict['adv_eddyflux_total']['varname'] = 'Total eddy flux conv.: '+r'$- \nabla \cdot \left(\bar{h}\vec{u}^{*}\hat{C}\right)$'
 
+#######################
 # 3rd Term: Eddy mixing
+#######################
+print('-> Eddy mixing')
 zonal_eddymix = uhc_advflux_convergence - adv_zonal_mean_flux - adv_zonal_eddy_flux
 merid_eddymix = vhc_advflux_convergence - adv_merid_mean_flux - adv_merid_eddy_flux
 total_eddymix = zonal_eddymix+merid_eddymix
@@ -271,19 +318,25 @@ budget_dict['eddymix_total']['varname'] = 'Total eddy mixing: '+r'$- \nabla \cdo
 
 
 # %% Plot tracer budget for simulation
+print('Generate the tracer budget plot.')
 
-plot_array = np.empty((2,3), dtype=object)
+savefig = True
+factor = 1e6
+fontsize=18
+plt.rcParams['font.size']=fontsize
+
+numrows = 2
+numcols = 3
+plot_array = np.empty((numrows,numcols), dtype=object)
 plot_array[0,0] = budget_dict['advection']
 plot_array[0,1] = budget_dict['consumption']
 plot_array[0,2] = budget_dict['sum_of_forcing_relaxation_diffusion']
 plot_array[1,0] = budget_dict['adv_meanflux_total']
 plot_array[1,1] = budget_dict['adv_eddyflux_total']
 plot_array[1,2] = budget_dict['eddymix_total']
-
 #
-fontsize=18
-plt.rcParams['font.size']=fontsize
-fig, ax = plt.subplots(2,3,figsize=(18,12),sharex=True,sharey=True)
+
+fig, ax = plt.subplots(numrows,numcols,figsize=(18,12),sharex=True,sharey=True)
 panel_labs = ['a)','b)','c)','d)','e)','f)']
 props = dict(boxstyle='round', facecolor='#EEEEEE', alpha=0.9)
 
@@ -310,31 +363,30 @@ cbar.ax.set_title(r"$\times$ {:1.0e}".format(1/factor),loc='left',pad=30,fontsiz
 add_arrows_to_plots(fig,ax[1,0],ax[0,0],"arc3")
 add_arrows_to_plots(fig,ax[1,1],ax[0,0],"bar,angle={},fraction={}".format(180,-0.06))
 add_arrows_to_plots(fig,ax[1,2],ax[0,0],"bar,angle={},fraction={}".format(180,-0.06/2))
-figname = '../plots/fig_tracer_budget'
-plt.savefig('{}.png'.format(figname),dpi=250)
-os.system('convert {}.png {}.pdf'.format(figname,figname))
+if savefig == True:
+    figname = '../plots/fig_tracer_budget'
+    plt.savefig('{}.png'.format(figname),dpi=250)
+    os.system('convert {}.png {}.pdf'.format(figname,figname))
 plt.show()
 
-
 #%% Plot individual figure
-
-fontsize=16
-plt.rcParams['font.size']=fontsize
-titles = ['a) ','b) ','c) ','d) ','e) ','f) ','g) ','h) ','i) ']
-for kdx,key in enumerate(budget_dict.keys()):
-    fig, ax = plt.subplots(figsize=(7,5))
-    factor = 1e6
-    c0 = ax.contourf(ds_eta.LONGITUDE,ds_eta.LATITUDE,budget_dict[key]['data']*factor,levels=np.linspace(-1e-6*factor,1e-6*factor,33),cmap='seismic',extend='both')
-    ax.pcolormesh(ds_topo.LONGITUDE1,ds_topo.LATITUDE,land,cmap=c.ListedColormap(['#777777']))
-    ax.set_title(titles[kdx]+budget_dict[key]['varname'],loc='left')
-    cbar = plt.colorbar(c0,pad=0.01,label='ms$^{-1}$')
-    cbar.ax.set_title(r" {:1.0e}".format(1/factor),loc='left',pad=15)
-    for hlineval in [0,20,40]:
-        ax.axhline(hlineval,linestyle='--',color='k',alpha=0.2,linewidth=1)
-    for vlineval in [-60,-40,-20,0]:
-        ax.axvline(vlineval,linestyle='--',color='k',alpha=0.2,linewidth=1)
-    ax.set_xticks([-60,-40,-20,0])
-    ax.set_xticklabels(['60°W','40°W','20°W','0°'],fontsize=fontsize-2)
-    ax.set_yticks([-20,0,20,40])
-    ax.set_yticklabels(['20°S','Eq.','20°N','40°N'],fontsize=fontsize-2)
-    plt.show()
+# fontsize=16
+# plt.rcParams['font.size']=fontsize
+# titles = ['a) ','b) ','c) ','d) ','e) ','f) ','g) ','h) ','i) ','j) ']
+# for kdx,key in enumerate(budget_dict.keys()):
+#     fig, ax = plt.subplots(figsize=(7,5))
+#     factor = 1e6
+#     c0 = ax.contourf(ds_eta.LONGITUDE,ds_eta.LATITUDE,budget_dict[key]['data']*factor,levels=np.linspace(-1e-6*factor,1e-6*factor,33),cmap='seismic',extend='both')
+#     ax.pcolormesh(ds_topo.LONGITUDE1,ds_topo.LATITUDE,land,cmap=c.ListedColormap(['#777777']))
+#     ax.set_title(titles[kdx]+budget_dict[key]['varname'],loc='left')
+#     cbar = plt.colorbar(c0,pad=0.01,label='ms$^{-1}$')
+#     cbar.ax.set_title(r" {:1.0e}".format(1/factor),loc='left',pad=15)
+#     for hlineval in [0,20,40]:
+#         ax.axhline(hlineval,linestyle='--',color='k',alpha=0.2,linewidth=1)
+#     for vlineval in [-60,-40,-20,0]:
+#         ax.axvline(vlineval,linestyle='--',color='k',alpha=0.2,linewidth=1)
+#     ax.set_xticks([-60,-40,-20,0])
+#     ax.set_xticklabels(['60°W','40°W','20°W','0°'],fontsize=fontsize-2)
+#     ax.set_yticks([-20,0,20,40])
+#     ax.set_yticklabels(['20°S','Eq.','20°N','40°N'],fontsize=fontsize-2)
+#     plt.show()
