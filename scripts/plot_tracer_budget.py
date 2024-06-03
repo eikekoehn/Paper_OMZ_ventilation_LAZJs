@@ -1,4 +1,4 @@
-#%%
+#%% Load packages
 import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
@@ -6,7 +6,6 @@ import cmocean as cmo
 import numpy.ma as ma
 from matplotlib import colors as c
 import os
-# /nfs/kryo/work/koehne/masterthesis_kiel/smomw279/RRC_tracer_equator/analysis/run0133/budget/run0133_tracer_budget_calconly.py
 
 #%% Load further utilities and define function
 
@@ -14,13 +13,11 @@ import swm_utilities
 
 def add_arrows_to_plots(fig,start_axi,end_axi,connectionstyle):
     from matplotlib import patches
-    from matplotlib.patches import ConnectionPatch
     arrow = patches.ConnectionPatch(
         [-25,59],
         [-25,-21],
         coordsA=start_axi.transData,
         coordsB=end_axi.transData,
-        # Default shrink parameter is 0 so can be omitted
         color="#777777",
         arrowstyle="-|>",  # "normal" arrow
         mutation_scale=30,  # controls arrow head size
@@ -107,8 +104,8 @@ url_root_output = swm_utilities.load_data_directories()
 
 #%% Get the land mask
 land, ds_topo = swm_utilities.get_topograpy()
-#%% Open the datasets
 
+#%% Open the datasets
 ds_eta = xr.open_dataset('{}eta.nc'.format(url_root_output),decode_times=False)
 ds_T1_CH = xr.open_dataset('{}T1_CH.nc'.format(url_root_output),decode_times=False)
 ds_T1_C = xr.open_dataset('{}T1_C.nc'.format(url_root_output),decode_times=False)
@@ -218,7 +215,11 @@ for var2load in datasets_to_load.keys():
     variable_dict[var2load]['dataarray'] = selected_t
     print('Calculation for mean of {} done'.format(var2load))
 
-#%% Calculate thickness weighted averages and bolus velcoities
+#%% Calculate values for the calculations of gradients etc.
+print('Calculate values for the calculations of gradients etc.')
+dLambda, dTheta, coslat_v, coslat_h, A = set_up_gradient_arrays(variable_dict)
+
+#%% Calculate thickness weighted averages and bolus velocities
 print('Calculate thickness weighted averages and bolus velcoities')
 undisturbed_depth = 500.
 C_hat = variable_dict['CH']['varmean']/(variable_dict['eta']['varmean']+undisturbed_depth)
@@ -256,16 +257,15 @@ budget_dict['sum_of_forcing_relaxation_diffusion'] = dict()
 budget_dict['sum_of_forcing_relaxation_diffusion']['data'] = forcing+relaxation+diffusive_flux_convergence
 budget_dict['sum_of_forcing_relaxation_diffusion']['varname'] = 'Sum of other budget terms'
 
-
-#%% Calculate values for the calculations of gradients etc.
-print('Calculate values for the calculations of gradients etc.')
-dLambda, dTheta, coslat_v, coslat_h, A = set_up_gradient_arrays(variable_dict)
-
 #%% Calculate the advective flux convergence and put into budget_dictionary
 print('Calculate the advective flux convergence term.')
 
-uhc_advflux_convergence, vhc_advflux_convergence, advective_flux_convergence = calc_advective_flux_convergence(variable_dict,A,
-                                                                                                               dLambda,dTheta,coslat_h,coslat_v)
+uhc_advflux_convergence, vhc_advflux_convergence, advective_flux_convergence = calc_advective_flux_convergence(variable_dict,
+                                                                                                               A,
+                                                                                                               dLambda,
+                                                                                                               dTheta,
+                                                                                                               coslat_h,
+                                                                                                               coslat_v)
 budget_dict['advection'] = dict()
 budget_dict['advection']['data'] = advective_flux_convergence
 budget_dict['advection']['varname'] = 'Advective flux conv.: '+r'$- \nabla \cdot \left(\overline{h\vec{u}C}\right)$'
@@ -286,8 +286,12 @@ print('Separate the total advective flux into the eddy flux conv., mean flux con
 #######################################################################
 print('-> Mean advection')
 
-adv_zonal_mean_flux, adv_merid_mean_flux, adv_total_mean_flux = calc_mean_advective_flux_convergence(variable_dict,A,
-                                                                                                     dLambda,dTheta,coslat_h,coslat_v)
+adv_zonal_mean_flux, adv_merid_mean_flux, adv_total_mean_flux = calc_mean_advective_flux_convergence(variable_dict,
+                                                                                                     A,
+                                                                                                     dLambda,
+                                                                                                     dTheta,
+                                                                                                     coslat_h,
+                                                                                                     coslat_v)
 budget_dict['adv_meanflux_total'] = dict()
 budget_dict['adv_meanflux_total']['data'] = adv_total_mean_flux
 budget_dict['adv_meanflux_total']['varname'] = 'Total mean flux conv.: '+r'$- \nabla \cdot \left(\bar{h}\bar{\vec{u}}\hat{C}\right)$'
@@ -298,8 +302,12 @@ budget_dict['adv_meanflux_total']['varname'] = 'Total mean flux conv.: '+r'$- \n
 #####################################################################
 print('-> Eddy advection')
 
-adv_zonal_eddy_flux, adv_merid_eddy_flux, adv_total_eddy_flux = calc_eddy_advective_flux_convergence(variable_dict,A,
-                                                                                                     dLambda,dTheta,coslat_h,coslat_v)
+adv_zonal_eddy_flux, adv_merid_eddy_flux, adv_total_eddy_flux = calc_eddy_advective_flux_convergence(variable_dict,
+                                                                                                     A,
+                                                                                                     dLambda,
+                                                                                                     dTheta,
+                                                                                                     coslat_h,
+                                                                                                     coslat_v)
 budget_dict['adv_eddyflux_total'] = dict()
 budget_dict['adv_eddyflux_total']['data'] = adv_total_eddy_flux
 budget_dict['adv_eddyflux_total']['varname'] = 'Total eddy flux conv.: '+r'$- \nabla \cdot \left(\bar{h}\vec{u}^{*}\hat{C}\right)$'
@@ -320,7 +328,7 @@ budget_dict['eddymix_total']['varname'] = 'Total eddy mixing: '+r'$- \nabla \cdo
 # %% Plot tracer budget for simulation
 print('Generate the tracer budget plot.')
 
-savefig = True
+savefig = False
 factor = 1e6
 fontsize=18
 plt.rcParams['font.size']=fontsize
@@ -369,24 +377,4 @@ if savefig == True:
     os.system('convert {}.png {}.pdf'.format(figname,figname))
 plt.show()
 
-#%% Plot individual figure
-# fontsize=16
-# plt.rcParams['font.size']=fontsize
-# titles = ['a) ','b) ','c) ','d) ','e) ','f) ','g) ','h) ','i) ','j) ']
-# for kdx,key in enumerate(budget_dict.keys()):
-#     fig, ax = plt.subplots(figsize=(7,5))
-#     factor = 1e6
-#     c0 = ax.contourf(ds_eta.LONGITUDE,ds_eta.LATITUDE,budget_dict[key]['data']*factor,levels=np.linspace(-1e-6*factor,1e-6*factor,33),cmap='seismic',extend='both')
-#     ax.pcolormesh(ds_topo.LONGITUDE1,ds_topo.LATITUDE,land,cmap=c.ListedColormap(['#777777']))
-#     ax.set_title(titles[kdx]+budget_dict[key]['varname'],loc='left')
-#     cbar = plt.colorbar(c0,pad=0.01,label='ms$^{-1}$')
-#     cbar.ax.set_title(r" {:1.0e}".format(1/factor),loc='left',pad=15)
-#     for hlineval in [0,20,40]:
-#         ax.axhline(hlineval,linestyle='--',color='k',alpha=0.2,linewidth=1)
-#     for vlineval in [-60,-40,-20,0]:
-#         ax.axvline(vlineval,linestyle='--',color='k',alpha=0.2,linewidth=1)
-#     ax.set_xticks([-60,-40,-20,0])
-#     ax.set_xticklabels(['60°W','40°W','20°W','0°'],fontsize=fontsize-2)
-#     ax.set_yticks([-20,0,20,40])
-#     ax.set_yticklabels(['20°S','Eq.','20°N','40°N'],fontsize=fontsize-2)
-#     plt.show()
+#%%
