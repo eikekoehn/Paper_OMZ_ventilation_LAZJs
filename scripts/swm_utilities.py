@@ -25,6 +25,8 @@ def get_topograpy():
     return land, ds_topo
 
 def get_glorys_climatology():
+    # Obtained from https://data.marine.copernicus.eu/product/GLOBAL_MULTIYEAR_PHY_001_030/description, i.e., the monthly climatology under
+    # https://data.marine.copernicus.eu/product/GLOBAL_MULTIYEAR_PHY_001_030/files?subdataset=cmems_mod_glo_phy_my_0.083deg-climatology_P1M-m_202311
     glorys_path = '/nfs/kryo/work/datasets/grd/ocean/3d/ra/glorys/glorys12v1/monthly_climatology/'
     ds_glorys = xr.open_mfdataset(glob.glob('{}*.nc'.format(glorys_path)))
     return ds_glorys
