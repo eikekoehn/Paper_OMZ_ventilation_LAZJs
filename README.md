@@ -6,3 +6,4 @@ by Eike E. Köhn, Richard J. Greatbatch, Peter Brandt, and Martin Claus.
 
 The model simulation data underlying the study can be found on [Claus and Köhn (2024)](https://hdl.handle.net/20.500.12085/dd331654-413c-4157-8796-6edf4c4be207).
 
+[![DOI](https://zenodo.org/badge/803856083.svg)](https://zenodo.org/doi/10.5281/zenodo.11447290)
