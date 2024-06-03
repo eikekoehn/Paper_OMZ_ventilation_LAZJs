@@ -36,7 +36,7 @@ def set_up_gradient_arrays(variable_dict):
     ny = 701
     d2r = (2*np.pi)/360
     dLambda = (lon_e - lon_s)/(nx-1)*d2r # longitudinal grid spacing in radians
-    dTheta = (lat_e - lat_s)/(ny-1)*d2r # latitudinal grid spacing in radians
+    dTheta  = (lat_e - lat_s)/(ny-1)*d2r # latitudinal  grid spacing in radians
     coslat_v = np.cos(variable_dict['vhc']['dataarray'].LATITUDE.values*np.pi/180)
     coslat_h = np.cos(variable_dict['eta']['dataarray'].LATITUDE.values*np.pi/180)
     return dLambda, dTheta, coslat_v, coslat_h, A
