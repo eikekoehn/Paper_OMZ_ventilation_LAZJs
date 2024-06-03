@@ -32,6 +32,7 @@ def get_glorys_climatology():
     return ds_glorys
 
 def get_oxygen_data():
+    # https://www.ncei.noaa.gov/access/world-ocean-atlas-2018/
     woa_path = '/nfs/kryo/work/updata/woa2018/oxygen/all/1.00/'
     woa_file = 'woa18_all_o_annual.nc'
     ds_oxy = xr.open_dataset(woa_path+woa_file,decode_times=False)
